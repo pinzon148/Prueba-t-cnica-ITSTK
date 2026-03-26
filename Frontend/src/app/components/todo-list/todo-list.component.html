@@ -1,0 +1,180 @@
+<div class="layout">
+
+  <!-- Sidebar / Header panel -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-icon">✓</span>
+      <span class="brand-name">TodoList</span>
+    </div>
+
+    <div class="stats-group">
+      <div class="stat-card">
+        <span class="stat-value">{{ todos.length }}</span>
+        <span class="stat-label">Total</span>
+      </div>
+      <div class="stat-card pending">
+        <span class="stat-value">{{ pendingCount }}</span>
+        <span class="stat-label">Pendientes</span>
+      </div>
+      <div class="stat-card done">
+        <span class="stat-value">{{ completedCount }}</span>
+        <span class="stat-label">Completadas</span>
+      </div>
+    </div>
+
+    <button class="btn-new" (click)="openCreateModal()">
+      <span class="btn-new-icon">+</span>
+      Nueva tarea
+    </button>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+    <header class="main-header">
+      <div>
+        <h1>Mis tareas</h1>
+        <p class="subtitle">Gestiona y organiza tu lista de pendientes</p>
+      </div>
+    </header>
+
+    <!-- Loading state -->
+    <div class="loading-state" *ngIf="loading">
+      <div class="spinner"></div>
+      <span>Cargando tareas...</span>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state" *ngIf="!loading && todos.length === 0">
+      <div class="empty-icon">📋</div>
+      <p class="empty-title">No hay tareas aún</p>
+      <p class="empty-sub">Crea tu primera tarea para comenzar</p>
+      <button class="btn-new inline" (click)="openCreateModal()">+ Nueva tarea</button>
+    </div>
+
+    <!-- Task list -->
+    <div class="task-list" *ngIf="!loading && todos.length > 0">
+      <div
+        class="task-card"
+        *ngFor="let todo of todos"
+        [class.task-done]="todo.isCompleted"
+        [class.task-overdue]="isOverdue(todo)"
+      >
+        <!-- Checkbox -->
+        <div class="task-check" (click)="toggleCompleted(todo)">
+          <div class="check-box" [class.checked]="todo.isCompleted">
+            <span *ngIf="todo.isCompleted">✓</span>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="task-body">
+          <div class="task-title" [class.done-text]="todo.isCompleted">
+            {{ todo.title }}
+            <span class="badge overdue" *ngIf="isOverdue(todo)">Vencida</span>
+          </div>
+          <div class="task-desc" *ngIf="todo.description">{{ todo.description }}</div>
+          <div class="task-meta">
+            <span class="meta-item">
+              <svg viewBox="0 0 16 16" fill="none" class="meta-icon">
+                <rect x="1" y="2" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M5 1v2M11 1v2M1 6h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              Límite: {{ formatDate(todo.maxCompletionDate) }}
+            </span>
+            <span class="meta-item muted">
+              Creada: {{ formatDate(todo.createdAt) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="task-actions">
+          <button
+            class="action-btn edit"
+            (click)="openEditModal(todo)"
+            [disabled]="todo.isCompleted"
+            title="Editar"
+          >
+            <svg viewBox="0 0 16 16" fill="none">
+              <path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button
+            class="action-btn delete"
+            (click)="deleteTodo(todo)"
+            title="Eliminar"
+          >
+            <svg viewBox="0 0 16 16" fill="none">
+              <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9h8l1-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" *ngIf="showModal" (click)="closeModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+
+    <div class="modal-header">
+      <h2>{{ editingTodo ? 'Editar tarea' : 'Nueva tarea' }}</h2>
+      <button class="modal-close" (click)="closeModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+
+      <div class="field">
+        <label>
+          Título
+          <span class="required">*</span>
+          <span class="chars-left" [class.chars-warn]="titleCharsLeft <= 10">
+            {{ titleCharsLeft }} restantes
+          </span>
+        </label>
+        <input
+          type="text"
+          [(ngModel)]="formTitle"
+          maxlength="40"
+          placeholder="¿Qué necesitas hacer?"
+          class="form-input"
+        />
+      </div>
+
+      <div class="field">
+        <label>
+          Descripción
+          <span class="chars-left" [class.chars-warn]="descCharsLeft <= 30">
+            {{ descCharsLeft }} restantes
+          </span>
+        </label>
+        <textarea
+          [(ngModel)]="formDescription"
+          maxlength="200"
+          placeholder="Detalles opcionales..."
+          rows="3"
+          class="form-input"
+        ></textarea>
+      </div>
+
+      <div class="field">
+        <label>Fecha máxima de completado <span class="required">*</span></label>
+        <input
+          type="date"
+          [(ngModel)]="formMaxDate"
+          [min]="todayDate"
+          class="form-input"
+        />
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeModal()" [disabled]="saving">Cancelar</button>
+      <button class="btn-submit" (click)="submitForm()" [disabled]="saving">
+        <span *ngIf="!saving">{{ editingTodo ? 'Guardar cambios' : 'Crear tarea' }}</span>
+        <span *ngIf="saving" class="btn-saving">Guardando...</span>
+      </button>
+    </div>
+  </div>
+</div>
